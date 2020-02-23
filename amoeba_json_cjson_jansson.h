@@ -4,7 +4,7 @@
 
 
 #include <stdlib.h>
-#include <cjson/cJSON.h>
+#include <cJSON/cJSON.h>
 #include <jansson.h>
 
 
