@@ -8,13 +8,13 @@
 #include <neko.h>
 
 
-#ifndef AMOEBA_JSON_DEPTH_LIM
-#define AMOEBA_JSON_DEPTH_LIM 256
+#ifndef AMOEBA_JSON_REC_DEPTH_LIM
+#define AMOEBA_JSON_REC_DEPTH_LIM 256
 #endif
 
 
-value convert_cjson_to_neko(cJSON *src);
-cJSON *convert_neko_to_cjson(value src);
+extern value convert_cjson_to_neko(cJSON *src);
+extern cJSON *convert_neko_to_cjson(value src);
 
 
 #endif

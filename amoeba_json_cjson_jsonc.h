@@ -8,8 +8,8 @@
 #include <json-c/json.h>
 
 
-json_object *convert_cjson_to_jsonc(cJSON *src);
-cJSON *convert_jsonc_to_cjson(json_object *src);
+extern json_object *convert_cjson_to_jsonc(cJSON *src);
+extern cJSON *convert_jsonc_to_cjson(json_object *src);
 
 
 #endif

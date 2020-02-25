@@ -8,8 +8,8 @@
 #include <parson.h>
 
 
-JSON_Value *convert_cjson_to_parson(cJSON *src);
-cJSON *convert_parson_to_cjson(JSON_Value *src);
+extern JSON_Value *convert_cjson_to_parson(cJSON *src);
+extern cJSON *convert_parson_to_cjson(JSON_Value *src);
 
 
 #endif

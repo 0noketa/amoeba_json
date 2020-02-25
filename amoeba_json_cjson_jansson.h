@@ -8,8 +8,8 @@
 #include <jansson.h>
 
 
-json_t *convert_cjson_to_jansson(cJSON *src);
-cJSON *convert_jansson_to_cjson(json_t *src);
+extern json_t *convert_cjson_to_jansson(cJSON *src);
+extern cJSON *convert_jansson_to_cjson(json_t *src);
 
 
 #endif

@@ -9,8 +9,13 @@
 #include <tcl.h>
 
 
-cJSON *convert_tcl_to_cjson(Tcl_Interp *interp, Tcl_Obj *src);
-Tcl_Obj *convert_cjson_to_tcl(Tcl_Interp *interp, cJSON *src);
+#ifndef AMOEBA_JSON_REC_DEPTH_LIM
+#define AMOEBA_JSON_REC_DEPTH_LIM 256
+#endif
+
+
+extern cJSON *convert_tcl_to_cjson(Tcl_Interp *interp, Tcl_Obj *src);
+extern Tcl_Obj *convert_cjson_to_tcl(Tcl_Interp *interp, cJSON *src);
 
 
 

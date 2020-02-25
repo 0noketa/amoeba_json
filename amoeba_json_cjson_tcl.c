@@ -1,12 +1,20 @@
 #include "amoeba_json_cjson_tcl.h"
 
 
-cJSON *convert_tcl_to_cjson(Tcl_Interp *interp, Tcl_Obj *src)
+static cJSON *convert_tcl_to_cjson__internal(Tcl_Interp *interp, Tcl_Obj *src, size_t depth)
 {
-	Tcl_ObjType t;
-	Tcl_ConvertToType(interp, src, &t);
+	if (depth >= AMOEBA_JSON_REC_DEPTH_LIM || interp == NULL || src == NULL)
+		return cJSON_CreateNull();
 
-	if (!strcmp(t.name, "int"))
+	const char *name = src != NULL
+		&& src->typePtr != NULL
+		? src->typePtr->name
+		: NULL;
+
+	if (name == NULL)
+		return cJSON_CreateString(Tcl_GetStringFromObj(src, NULL));
+
+	if (!strcmp(name, "int"))
 	{
 		int i;
 
@@ -15,7 +23,7 @@ cJSON *convert_tcl_to_cjson(Tcl_Interp *interp, Tcl_Obj *src)
 		return cJSON_CreateNumber(i);
 	}
 
-	if (!strcmp(t.name, "double"))
+	if (!strcmp(name, "double"))
 	{
 		double d;
 
@@ -24,32 +32,71 @@ cJSON *convert_tcl_to_cjson(Tcl_Interp *interp, Tcl_Obj *src)
 		return cJSON_CreateNumber(d);
 	}
 
-	if (!strcmp(t.name, "char *"))
+	if (!strcmp(name, "bytearray"))
 	{
-		int len;
-		const char *s = Tcl_GetStringFromObj(src, &len);
+		cJSON *result;
 
-		return cJSON_CreateString(s);
+		int size;
+		unsigned char *bytes = Tcl_GetByteArrayFromObj(src, &size);
+
+		int *a = malloc(size * sizeof(int));
+
+		if (a == NULL)
+			return cJSON_CreateArray();
+
+		int i;
+
+		for (i = 0; i < size; ++i)
+			a[i] = bytes[i];
+
+		result = cJSON_CreateIntArray(a, size);
+
+		free(a);
+
+		return result;
 	}
 
-	if (!strcmp(t.name, "dict"))
+	if (!strcmp(name, "list"))
 	{
-		cJSON *result = Tcl_NewDictObj();
+		cJSON *result = cJSON_CreateArray();
+
+		int size;
+		//Tcl_ListObjLength(interp, src, &size);
+
+		Tcl_Obj **objs = NULL;
+
+		Tcl_ListObjGetElements(interp, src, &size, &objs);
+
+		int i;
+
+		for (i = 0; i < size; ++i)
+		{
+			cJSON *val = convert_tcl_to_cjson__internal(interp, objs[i], depth + 1);
+
+			cJSON_AddItemToArray(result, val);
+		}
+
+		return result;
+	}
+
+	if (!strcmp(name, "dict"))
+	{
+		cJSON *result = cJSON_CreateObject();
 
 		Tcl_DictSearch search;
-		Tcl_Obj *key, *val;
+		Tcl_Obj *key, *item;
 		int done;
 
-		Tcl_DictObjFirst(interp, src, &search, &key, &val, &done);
+		Tcl_DictObjFirst(interp, src, &search, &key, &item, &done);
 
 		while (!done)
 		{
-			int len;
-			const char *key2 = Tcl_GetStringFromObj(src, &len);
+			const char *key2 = Tcl_GetStringFromObj(src, NULL);
+			cJSON *item2 = convert_tcl_to_cjson__internal(interp, item, depth + 1);
 
-			cJSON_AddItemToObject(result, key2, convert_tcl_to_cjson(val));
+			cJSON_AddItemToObject(result, key2, item2);
 
-			Tcl_DictObjNext(&search, &key, &val, &done);
+			Tcl_DictObjNext(&search, &key, &item, &done);
 		}
 
 		Tcl_DictObjDone(&search);
@@ -57,14 +104,20 @@ cJSON *convert_tcl_to_cjson(Tcl_Interp *interp, Tcl_Obj *src)
 		return result;
 	}
 
-	return NULL;
+	return cJSON_CreateString(Tcl_GetStringFromObj(src, NUL));
 }
+
+cJSON *convert_tcl_to_cjson(Tcl_Interp *interp, Tcl_Obj *src)
+{
+	return convert_tcl_to_cjson__internal(interp, src, 0);
+}
+
 
 Tcl_Obj *convert_cjson_to_tcl(Tcl_Interp *interp, cJSON *src)
 {
 	//?
-	if (src == NULL || cJSON_IsNull(src))
-		return NULL;
+	if (interp == NULL || src == NULL || cJSON_IsNull(src))
+		return Tcl_NewIntObj(0);
 
 	if (cJSON_IsString(src))
 	{
@@ -86,16 +139,24 @@ Tcl_Obj *convert_cjson_to_tcl(Tcl_Interp *interp, cJSON *src)
 
 	if (cJSON_IsArray(src))
 	{
-		Tcl_Obj *result = Tcl_NewListObj();
+		int size = cJSON_GetArraySize(src);
+
+		Tcl_Obj **objs = malloc(size * sizeof(Tcl_Obj*));
+
+		if (objs == NULL)
+			return Tcl_NewIntObj(0);
 
 		cJSON *item;
 		size_t i = 0;
 
 		cJSON_ArrayForEach(item, src)
 		{
-			Tcl_SetListObj(result, i, convert_cjson_to_tcl(item));
-			++i;
+			objs[i++] = convert_cjson_to_tcl(interp, item);
 		}
+
+		Tcl_Obj *result = Tcl_NewListObj(size, objs);
+
+		free(objs);
 
 		return result;
 	}
@@ -111,11 +172,11 @@ Tcl_Obj *convert_cjson_to_tcl(Tcl_Interp *interp, cJSON *src)
 			const char *key = item->string;
 			Tcl_Obj *key2 = Tcl_NewStringObj(key, strlen(key));
 
-			Tcl_DictObjPut(interp, result, key2, convert_cjson_to_tcl(item));
+			Tcl_DictObjPut(interp, result, key2, convert_cjson_to_tcl(interp, item));
 		}
 
 		return result;
 	}
 
-	return NULL;
+	return Tcl_NewIntObj(0);
 }

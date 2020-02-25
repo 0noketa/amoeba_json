@@ -25,7 +25,9 @@ value convert_cjson_to_neko(cJSON *src)
 
 		for (i = 0; i < size; ++i)
 		{
-			val_array_ptr(result)[i] = convert_cjson_to_neko(cJSON_GetArrayItem(src, i));
+			value val = convert_cjson_to_neko(cJSON_GetArrayItem(src, i));
+
+			val_array_ptr(result)[i] = val;
 		}
 
 		return result;
@@ -70,7 +72,7 @@ static void field_converter(value v, field f, void *arg0)
 
 static cJSON *convert_neko_to_cjson__internal(value src, size_t depth)
 {
-	if (depth >= AMOEBA_JSON_DEPTH_LIM)
+	if (depth >= AMOEBA_JSON_REC_DEPTH_LIM || val_is_null(src))
 		return cJSON_CreateNull();
 
 	if (val_is_float(src))
@@ -106,17 +108,16 @@ static cJSON *convert_neko_to_cjson__internal(value src, size_t depth)
 	{
 		cJSON *result = cJSON_CreateObject();
 
-		field_converter_arg arg = {
-			.depth = depth,
-			.result = result
-		};
+		field_converter_arg arg;
+		arg.depth = depth;
+		arg.result = result;
 
-		val_iter_fields(src, field_converter, result);
+		val_iter_fields(src, field_converter, &arg);
 
 		return result;
 	}
 
-	return cJSON_CreateFalse();
+	return cJSON_CreateNull();
 }
 
 cJSON *convert_neko_to_cjson(value src)
