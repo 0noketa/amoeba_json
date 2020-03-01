@@ -51,9 +51,12 @@ int convert_cjson_to_lua(lua_State *L, cJSON *src)
 */
 static int size_of_array(lua_State *L, int table)
 {
-	lua_len(L, table);  // -- len
-	int narr = lua_tointeger(L, -1);
-	lua_pop(L, 1);
+	#if LUA_VERSION_NUM > 501
+		lua_len(L, table);  // -- len
+		int narr = lua_tointeger(L, -1);
+
+		lua_pop(L, 1);
+	#endif
 
 	int i;
 	lua_pushnil(L);
@@ -62,7 +65,14 @@ static int size_of_array(lua_State *L, int table)
 	{
 		lua_pop(L, 1);
 
-		if (!lua_isinteger(L, -1) || lua_tointeger(L, -1) != i + 1)
+
+		if (
+			#if LUA_VERSION_NUM > 501
+				!lua_isinteger(L, -1)
+			#else
+				!lua_isnumber(L, -1)
+			#endif
+			|| lua_tointeger(L, -1) != i + 1)
 		{
 			lua_pop(L, 1);
 
@@ -70,9 +80,11 @@ static int size_of_array(lua_State *L, int table)
 		}
 	}
 
-	return i == narr
-			? narr
-			: -1;
+	#if LUA_VERSION_NUM > 501
+		return i == narr ? narr : -1;
+	#else
+		return i;
+	#endif
 }
 
 /*
@@ -89,8 +101,10 @@ cJSON *convert_lua_to_cjson(lua_State *L, int src)
 
 	if (src <= 0 || lua_isnil(L, src))
 		return cJSON_CreateNull();
-	if (lua_isinteger(L, src))
-		return cJSON_CreateNumber(lua_tointeger(L, src));
+	#if LUA_VERSION_NUM > 501
+		if (lua_isinteger(L, src))
+			return cJSON_CreateNumber(lua_tointeger(L, src));
+	#endif
 	if (lua_isnumber(L, src))
 		return cJSON_CreateNumber(lua_tonumber(L, src));
 	if (lua_isstring(L, src))
